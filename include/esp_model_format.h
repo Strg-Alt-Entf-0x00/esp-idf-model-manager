@@ -29,10 +29,8 @@ extern "C" {
 
 #define ESPM_MAGIC_STR                    "ESPM"
 #define ESPM_MAGIC_LE                     0x4D505345U
-#define ESPM_LEGACY_VERSION               2U
 #define ESPM_CURRENT_VERSION              3U
 #define ESPM_HEADER_SIZE                  128U
-#define ESPM_LEGACY_MAX_SECTIONS          8U
 #define ESPM_MAX_SECTIONS                 16U
 #define ESPM_ALIGNMENT                    64U
 #define ESPM_SECTION_ENTRY_SIZE           40U
@@ -69,9 +67,6 @@ typedef enum {
 
 typedef enum {
     SECTION_TYPE_VOCAB        = 1,
-    SECTION_TYPE_ENCODER      = 2,
-    SECTION_TYPE_DECODER      = 3,
-    SECTION_TYPE_WEIGHTS      = 4,
     SECTION_TYPE_CONFIG_JSON  = 5,
     SECTION_TYPE_TENSOR_INDEX = 6,
     SECTION_TYPE_TENSOR_DATA  = 7,

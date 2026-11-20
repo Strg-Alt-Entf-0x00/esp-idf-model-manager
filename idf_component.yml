@@ -1,15 +1,18 @@
 version: "1.0.0"
 name: "esp-idf-model-manager"
-description: "Universal Neural Model Manager and Single-File Container (ESPM) Scanner for ESP32-P4"
+description: "ESP-IDF component for validating ESPM model containers and managing filesystem-backed model entries"
 url: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-model-manager"
 repository: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-model-manager.git"
 license: "MIT"
 targets:
   - esp32p4
-  - esp32s3
-  - esp32
 
 dependencies:
   idf:
-    version: ">=5.3.0"
+    version: ">=6.0.2"
+
+files:
+  exclude:
+    - ".archive/**/*"
+    - ".docs/**/*"
 

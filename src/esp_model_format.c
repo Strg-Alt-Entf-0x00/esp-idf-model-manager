@@ -102,21 +102,14 @@ static bool valid_model_type(uint16_t type)
            type == MODEL_TYPE_CUSTOM;
 }
 
-static bool valid_quant_type(uint16_t quant, uint16_t version)
+static bool valid_quant_type(uint16_t quant)
 {
-    if (version == ESPM_LEGACY_VERSION) {
-        return quant <= MODEL_QUANT_FP32;
-    }
     return quant == MODEL_QUANT_INT8 || quant == MODEL_QUANT_INT8_PER_CH ||
            quant == MODEL_QUANT_FP32 || quant == MODEL_QUANT_MIXED;
 }
 
-static bool known_section_type(uint16_t section_type, uint16_t version)
+static bool known_section_type(uint16_t section_type)
 {
-    if (version == ESPM_LEGACY_VERSION) {
-        return section_type >= SECTION_TYPE_VOCAB &&
-               section_type <= SECTION_TYPE_TENSOR_DATA;
-    }
     return section_type == SECTION_TYPE_VOCAB ||
            section_type == SECTION_TYPE_CONFIG_JSON ||
            section_type == SECTION_TYPE_TENSOR_INDEX ||
@@ -159,26 +152,24 @@ esp_err_t esp_model_container_open(const esp_model_io_t *io,
     if (error != ESP_OK) {
         return error;
     }
-    if (header.magic != ESPM_MAGIC_LE ||
-        (header.format_version != ESPM_LEGACY_VERSION &&
-         header.format_version != ESPM_CURRENT_VERSION) ||
-        !valid_model_type(header.model_type) ||
-        !valid_quant_type(header.quant_type, header.format_version) ||
+    if (header.magic != ESPM_MAGIC_LE) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (header.format_version != ESPM_CURRENT_VERSION) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    if (!valid_model_type(header.model_type) ||
+        !valid_quant_type(header.quant_type) ||
         header.num_sections == 0 ||
-        (header.format_version == ESPM_LEGACY_VERSION &&
-         header.num_sections > ESPM_LEGACY_MAX_SECTIONS) ||
-        (header.format_version == ESPM_CURRENT_VERSION &&
-         header.num_sections > ESPM_MAX_SECTIONS) ||
+        header.num_sections > ESPM_MAX_SECTIONS ||
         !fixed_string_valid(header.model_name, sizeof(header.model_name), false) ||
-        !fixed_string_valid(header.version_str, sizeof(header.version_str),
-                            header.format_version == ESPM_LEGACY_VERSION) ||
+        !fixed_string_valid(header.version_str, sizeof(header.version_str), false) ||
         header.file_size != io->file_size ||
         header.section_table_offset != ESPM_HEADER_SIZE ||
         header.header_size != ESPM_HEADER_SIZE ||
         header.section_entry_size != ESPM_SECTION_ENTRY_SIZE ||
         header.alignment != ESPM_ALIGNMENT ||
-        (header.format_version == ESPM_CURRENT_VERSION &&
-         header.psram_required_kb == 0) ||
+        header.psram_required_kb == 0 ||
         header.flags != 0 ||
         !all_zero(header.reserved, sizeof(header.reserved))) {
         return ESP_ERR_INVALID_ARG;
@@ -220,14 +211,11 @@ esp_err_t esp_model_container_open(const esp_model_io_t *io,
     bool has_metadata = false;
     for (uint16_t i = 0; i < header.num_sections; ++i) {
         const esp_model_section_t *section = &out_container->sections[i];
-        if (!known_section_type(section->section_type, header.format_version) &&
-            (header.format_version != ESPM_CURRENT_VERSION ||
-             (section->flags & ESPM_SECTION_FLAG_OPTIONAL) == 0)) {
+        if (!known_section_type(section->section_type) &&
+            (section->flags & ESPM_SECTION_FLAG_OPTIONAL) == 0) {
             return ESP_ERR_NOT_SUPPORTED;
         }
-        if ((header.format_version == ESPM_LEGACY_VERSION && section->flags != 0) ||
-            (header.format_version == ESPM_CURRENT_VERSION &&
-             (section->flags & ~ESPM_SECTION_FLAG_OPTIONAL) != 0) ||
+        if ((section->flags & ~ESPM_SECTION_FLAG_OPTIONAL) != 0 ||
             !fixed_string_valid(section->name, sizeof(section->name), false) ||
             section->size == 0 ||
             section->offset % ESPM_ALIGNMENT != 0 ||
@@ -236,13 +224,12 @@ esp_err_t esp_model_container_open(const esp_model_io_t *io,
             section->size > header.file_size - section->offset) {
             return ESP_ERR_INVALID_SIZE;
         }
-        if (header.format_version == ESPM_CURRENT_VERSION &&
-            ((section->section_type == SECTION_TYPE_CONFIG_JSON &&
-              (section->flags & ESPM_SECTION_FLAG_OPTIONAL) == 0) ||
-             ((section->section_type == SECTION_TYPE_TENSOR_INDEX ||
-               section->section_type == SECTION_TYPE_TENSOR_DATA ||
-               section->section_type == SECTION_TYPE_METADATA) &&
-              (section->flags & ESPM_SECTION_FLAG_OPTIONAL) != 0))) {
+        if ((section->section_type == SECTION_TYPE_CONFIG_JSON &&
+             (section->flags & ESPM_SECTION_FLAG_OPTIONAL) == 0) ||
+            ((section->section_type == SECTION_TYPE_TENSOR_INDEX ||
+              section->section_type == SECTION_TYPE_TENSOR_DATA ||
+              section->section_type == SECTION_TYPE_METADATA) &&
+             (section->flags & ESPM_SECTION_FLAG_OPTIONAL) != 0)) {
             return ESP_ERR_INVALID_ARG;
         }
         has_tensor_index |= section->section_type == SECTION_TYPE_TENSOR_INDEX;
@@ -262,23 +249,20 @@ esp_err_t esp_model_container_open(const esp_model_io_t *io,
             }
         }
     }
-    if (header.format_version == ESPM_CURRENT_VERSION &&
-        (!has_tensor_index || !has_tensor_data || !has_metadata)) {
+    if (!has_tensor_index || !has_tensor_data || !has_metadata) {
         return ESP_ERR_INVALID_SIZE;
     }
     if (last_section_end != header.file_size) {
         return ESP_ERR_INVALID_SIZE;
     }
 
-    if (header.format_version == ESPM_CURRENT_VERSION) {
-        const uint64_t header_psram_bytes =
-            (uint64_t)header.psram_required_kb * 1024U;
-        for (uint16_t i = 0; i < header.num_sections; ++i) {
-            const esp_model_section_t *section = &out_container->sections[i];
-            if (section->section_type == SECTION_TYPE_TENSOR_DATA &&
-                header_psram_bytes < section->size) {
-                return ESP_ERR_INVALID_SIZE;
-            }
+    const uint64_t header_psram_bytes =
+        (uint64_t)header.psram_required_kb * 1024U;
+    for (uint16_t i = 0; i < header.num_sections; ++i) {
+        const esp_model_section_t *section = &out_container->sections[i];
+        if (section->section_type == SECTION_TYPE_TENSOR_DATA &&
+            header_psram_bytes < section->size) {
+            return ESP_ERR_INVALID_SIZE;
         }
     }
 

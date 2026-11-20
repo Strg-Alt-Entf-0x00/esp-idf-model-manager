@@ -106,6 +106,17 @@ static void build_container(uint8_t *data, uint32_t psram_required_kb,
     memcpy(data, &header, sizeof(header));
 }
 
+static void set_container_version(uint8_t *data, uint16_t version)
+{
+    esp_model_header_t header;
+    memcpy(&header, data, sizeof(header));
+    header.format_version = version;
+    header.header_crc32 = 0;
+    header.header_crc32 = esp_model_crc32(
+        (const uint8_t *)&header, sizeof(header));
+    memcpy(data, &header, sizeof(header));
+}
+
 static esp_err_t open_container(const uint8_t *data, size_t size)
 {
     const memory_file_t file = {.data = data, .size = size};
@@ -167,6 +178,9 @@ int main(void)
 
     build_container(data, 2, SECTION_TYPE_TENSOR_INDEX, 0);
     CHECK(open_container(data, TEST_FILE_END) == ESP_OK);
+
+    set_container_version(data, 2U);
+    CHECK(open_container(data, TEST_FILE_END) == ESP_ERR_NOT_SUPPORTED);
 
     build_container(data, 2, SECTION_TYPE_TENSOR_INDEX,
                     ESPM_SECTION_FLAG_OPTIONAL);
