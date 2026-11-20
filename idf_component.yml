@@ -4,15 +4,9 @@ description: "ESP-IDF component for validating ESPM model containers and managin
 url: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-model-manager"
 repository: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-model-manager.git"
 license: "MIT"
-targets:
-  - esp32p4
 
 dependencies:
   idf:
     version: ">=6.0.2"
 
-files:
-  exclude:
-    - ".archive/**/*"
-    - ".docs/**/*"
 

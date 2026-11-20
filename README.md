@@ -23,11 +23,13 @@ field definitions, and validation requirements.
 ## Requirements and target support
 
 - ESP-IDF 6.0.2 or later
-- ESP32-P4 is the component's currently declared target
 
-The container format and parser are not tied to a particular inference
-architecture. Other ESP targets may be considered after their ESP-IDF builds
-and filesystem/NVS behavior are validated.
+The component manifest intentionally omits a chip-specific target list.
+Component Manager interprets this as compatibility with all ESP-IDF targets.
+The implementation uses generic ESP-IDF services and does not depend on a
+specific inference architecture or accelerator. The full target build and
+runtime matrix has not yet been validated; check filesystem and NVS behavior
+on the selected target before production use.
 
 ## Add the component
 
