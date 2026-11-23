@@ -1,0 +1,11 @@
+version: "1.0.0"
+name: "esp-idf-model-manager"
+description: "ESP-IDF component for validating ESPM model containers and managing filesystem-backed model entries"
+url: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-model-manager"
+repository: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-model-manager.git"
+license: "PolyForm-Noncommercial-1.0.0"
+
+dependencies:
+  idf:
+    version: ">=6.0.2"
+
